@@ -1,0 +1,10 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/Christian/Documents/Workspace vari/VisualStudioCode Workspace/OpenGL/RaymarchingSeasons/build/cmake_install.cmake",
+		"C:/Users/Christian/Documents/Workspace vari/VisualStudioCode Workspace/OpenGL/RaymarchingSeasons/build/external/glfw-3.4/cmake_install.cmake",
+		"C:/Users/Christian/Documents/Workspace vari/VisualStudioCode Workspace/OpenGL/RaymarchingSeasons/build/external/glfw-3.4/src/cmake_install.cmake",
+		"C:/Users/Christian/Documents/Workspace vari/VisualStudioCode Workspace/OpenGL/RaymarchingSeasons/build/external/glew-build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

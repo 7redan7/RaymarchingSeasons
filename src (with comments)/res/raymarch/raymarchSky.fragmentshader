@@ -1,0 +1,149 @@
+#version 430 core
+
+// Inputs
+uniform mat4 u_InvVP;
+uniform vec3 u_CamPos;
+uniform vec2 u_Resolution;
+uniform float u_Time;
+uniform sampler2D u_Depth;
+
+// Outputs
+out vec3 color;
+
+// -------------------------------------------------------------------------------------------------------------
+// Value Noise
+// -------------------------------------------------------------------------------------------------------------
+
+float cloudHash(vec2 p)
+{
+	const vec2 k = vec2(0.3183099, 0.3678794);
+	float n = 109.0 * p.x + 113.0 * p.y;
+	vec2 h = fract(n * fract(k * n));
+	return fract(h.x + h.y);
+}
+
+float value2D(vec2 p)
+{
+	vec2 cell = floor(p); // Indice della cella e vertice con coordinate inferiori
+	vec2 f = fract(p); // Posizione relativa di p nella cella, compresa tra 0 e 1
+
+	f = f * f * (3.0 - 2.0 * f); // Fade: 3t^2 - 2t^3
+
+	return mix(mix(cloudHash(cell), cloudHash(cell + vec2(1.0, 0.0)), f.x),
+			   mix(cloudHash(cell + vec2(0.0, 1.0)), cloudHash(cell + vec2(1.0, 1.0)), f.x),
+			   f.y);
+}
+
+// -------------------------------------------------------------------------------------------------------------
+// Raymarch
+// -------------------------------------------------------------------------------------------------------------
+
+const float cloudLowerVerticalLimit = 18.0; 
+const float cloudUpperVerticalLimit = 26.0;
+const float cloudVerticalMidpoint = (cloudLowerVerticalLimit + cloudUpperVerticalLimit)/2;
+const float cloudHalfHeight = (cloudUpperVerticalLimit - cloudLowerVerticalLimit) / 2.0;
+const float windStrenght = 0.005;
+
+float densityMap(vec3 p)
+{
+	vec2 noisePosition = p.xz * 0.025 + vec2(0.5, 0.18) * (u_Time * windStrenght * 40.0);
+	float noise = value2D(noisePosition);
+	float coverage = smoothstep(0.46, 0.62, noise);
+	float verticalShape = 1.0 - smoothstep(0.0, 1.0, abs(p.y - cloudVerticalMidpoint) / cloudHalfHeight);
+	float cloudPotential = coverage * verticalShape;
+	return 0.01 - cloudPotential;
+}
+
+vec3 raymarch(vec3 ro, vec3 rd, vec3 background, vec3 sunlightColor)
+{
+	if (rd.y <= 0.001)      // Miss se il raggio non sale di altezza
+		return background;
+
+	// Rappresentano i valori che t assume lungo p(t) = ro + t * rd, corrispondenti
+	// alle intersezioni con i piani alle quote inferiore e superiore dello strato nuvoloso
+	// Sono gli estremi dell'intervallo verticale per il raymarcher
+	float startDistance = max(0.0, (cloudLowerVerticalLimit - ro.y) / rd.y);
+	float endDistance = min((cloudUpperVerticalLimit - ro.y) / rd.y, 1200.0);
+
+	if (endDistance <= startDistance || startDistance > 1200.0)
+		return background;
+
+	const int maxSteps = 12;
+	float stepLength = (endDistance - startDistance) / float(maxSteps);
+	float t = startDistance + 0.5 * stepLength;
+
+	// Valore [0,1], rappresenta quanto il colore del passo corrente influenza 
+	// il risultato finale. Infine maggiore è la trasmittance e maggiore influenze il 
+	// colore di background.
+	float transmittance = 1.0;
+
+	// Colore finale (parte vuoto) e il colore aggiunto ad ogni step
+	vec3 cloudColor = vec3(0.0);
+	vec3 addedCloudColor = mix(vec3(0.70, 0.75, 0.85), 
+							vec3(1.0, 0.96, 0.90) * sunlightColor, 
+							0.6);
+
+	// Coefficente che fa dissolvere le nuvole all'orizzonte
+	float horizonFade = smoothstep(0.01, 0.1, rd.y);
+
+	for (int i = 0; i < maxSteps; i++)
+	{
+		// Si campiona la density function. d è negativo se p è dentro una nuvola.
+		// Se d è negativo, allora -d rappresenta la densità.
+		vec3 p = ro + rd * t;
+		float d = densityMap(p);
+		float density = max(-d, 0.0);
+
+		// In base a density si calcola l'opacità della nuvole
+		float opacity = (1.0 - exp(-density * stepLength * 0.08)) * exp(-t * 0.001) * horizonFade;
+        
+		cloudColor += transmittance * opacity * addedCloudColor;
+		transmittance *= 1.0 - opacity;
+
+		if (transmittance < 0.02)
+			break;
+		t += stepLength;
+	}
+
+	return cloudColor + transmittance * background;
+}
+
+// -------------------------------------------------------------------------------------------------------------
+// Sky
+// -------------------------------------------------------------------------------------------------------------
+
+const vec3 skyHorizonColor = vec3(0.65, 0.75, 0.85);
+const vec3 skyZenithColor = vec3(0.15, 0.35, 0.65);
+
+vec3 skyGradient(vec3 viewDir)
+{
+	float skyHeight = clamp(viewDir.y, 0.0, 1.0);
+	float skyBlend = 1.0 - pow(1.0 - skyHeight, 4.0);
+	return mix(skyHorizonColor, skyZenithColor, skyBlend);
+}
+
+// -------------------------------------------------------------------------------------------------------------
+// Main
+// -------------------------------------------------------------------------------------------------------------
+
+const vec3 sunlightColor = mix(vec3(1.0), vec3(1.0, 0.8, 0.4), 0.25);
+
+void main()
+{
+	ivec2 pixel = ivec2(gl_FragCoord.xy);
+	float depth = texelFetch(u_Depth, pixel, 0).r;
+	if (depth != 1.0)
+		discard;
+
+	// Ricostruzione della direzione del raggio che va dalla camera al pixel.
+	vec2 ndc = (gl_FragCoord.xy / u_Resolution) * 2.0 - 1.0;
+	vec4 farClip = vec4(ndc, 1.0, 1.0);
+	vec4 far = u_InvVP * farClip;
+	far /= far.w;
+	vec3 ro = u_CamPos;
+	vec3 rd = normalize(far.xyz - ro);
+
+	color = skyGradient(rd);
+	color = raymarch(ro, rd, color, sunlightColor);
+	return;
+}

@@ -1,0 +1,12 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+C:/Users/Christian/Documents/Workspace vari/VisualStudioCode Workspace/OpenGL/RaymarchingSeasons/external/glew-2.3.1/build/glew.rc
+windows.h
+-
+

@@ -1,0 +1,268 @@
+#version 430 core
+
+// Inputs
+uniform mat4 u_InvVP;
+uniform mat4 u_VP;
+uniform vec3 u_CamPos;
+uniform vec2 u_Resolution;
+
+uniform vec2 u_RegionCenter;
+uniform float u_CurrentSeason;
+
+layout(binding = 3) uniform sampler2D u_Heightmap;
+uniform float u_HeightTexelSize;
+uniform float u_HeightmapWorldSize;
+
+// Outputs
+layout(location = 0) out vec3 outNormal;
+layout(location = 1) out vec4 outAlbedo;
+
+// -------------------------------------------------------------------------------------------------------------
+// Terrain
+// -------------------------------------------------------------------------------------------------------------
+
+float fbmMaxValue()
+{
+	const int octaves = 4;
+	const float gain = 0.34;
+	float a = 0.5;
+	float s = 0.0;
+
+	for (int i = 0; i < octaves; i++)
+	{
+		s += a;
+		a *= gain;
+	}
+
+	return s;
+}
+
+float terrainHeightAt(vec2 xz)
+{
+	return textureLod(u_Heightmap, xz / u_HeightmapWorldSize, 0.0).r;
+}
+
+// -------------------------------------------------------------------------------------------------------------
+// SDFs
+// -------------------------------------------------------------------------------------------------------------
+
+float sdEllipsoid(vec3 p, vec2 r)
+{
+	float k0 = length(p / r.xyx);
+	float k1 = length(p / (r.xyx * r.xyx));
+	return k0 * (k0 - 1.0) / k1;
+}
+
+float sdBoundingRegion(vec3 p)
+{
+	float heightRegionHalfSize = 0.5 * u_HeightmapWorldSize - 2.0 * u_HeightTexelSize;
+	vec2 q = abs(p.xz - u_RegionCenter) - heightRegionHalfSize;
+	return length(max(q,0.0)) + min(max(q.x, q.y), 0.0);
+}
+
+// -------------------------------------------------------------------------------------------------------------
+// Scene
+// -------------------------------------------------------------------------------------------------------------
+
+vec2 TreeHash(vec2 p)
+{
+	const vec2 k = vec2(0.3183099, 0.3678794);
+	float n = 109.0 * p.x + 113.0 * p.y;
+	return fract(n * fract(k * n));
+}
+
+const float sceneScale = 0.1;
+const float tileSize = 2.0;
+const float baseTreeHeight = 4.8;
+
+vec3 seasonColor(int season, vec2 tileIndex, float t)
+{
+	if (season == 0)
+		return mix(vec3(0.16, 0.32, 0.12), vec3(0.34, 0.55, 0.22), t);
+	if (season == 1)
+		return mix(vec3(0.10, 0.45, 0.08), vec3(0.37, 0.75, 0.18), t);
+	if (season == 2)
+	{
+		float variation = TreeHash(tileIndex + vec2(53.1, 24.7)).y;
+		vec3 autumn = variation < 0.333 ? vec3(0.82, 0.42, 0.12) :
+						variation < 0.666 ? vec3(0.90, 0.62, 0.20) :
+											vec3(0.59, 0.35, 0.18);
+		return autumn * mix(0.9, 1.1, t);
+	}
+	return mix(vec3(0.72, 0.78, 0.82), vec3(0.96, 0.97, 1.0), t);
+}
+
+vec3 hashColor(vec2 tileIndex)
+{
+	float t = TreeHash(tileIndex + vec2(37.2, 19.8)).x;
+	int season = int(floor(u_CurrentSeason));
+	float blend = smoothstep(0.75, 1.0, fract(u_CurrentSeason));
+	return mix(seasonColor(season, tileIndex, t), seasonColor((season + 1) % 4, tileIndex, t), blend);
+}
+
+float map(vec3 p, float terrainHeight, out vec2 treeTile)
+{
+	vec3 pMeters = vec3(p.x, p.y - terrainHeight, p.z) / sceneScale;
+	float closestTreeDist = 10000.0;
+	vec2 tileIndex = floor(pMeters.xz / tileSize);
+	vec2 tileOffset = fract(pMeters.xz / tileSize);
+	treeTile = tileIndex;
+	for (int j = 0; j <= 1; j++)
+	for (int i = 0; i <= 1; i++)
+	{
+
+		vec2 currentNeighbor = vec2(float(i), float(j)) - step(tileOffset, vec2(0.5));
+
+
+		vec2 treeCenter = TreeHash(tileIndex + currentNeighbor);
+		vec2 treeSize = TreeHash(tileIndex + currentNeighbor + vec2(13.1, 71.7));
+
+		vec2 d = (currentNeighbor - tileOffset + treeCenter);
+		float treeHeight = baseTreeHeight * (0.4 + 0.8 * treeSize.x);
+		float treeWidth = 0.5;
+
+		vec3 pLocal = vec3(d.x, pMeters.y - 0.5 * treeHeight, d.y);
+		float treeDist = sdEllipsoid(pLocal, vec2(treeWidth, 0.5 * treeHeight));
+		if (treeDist < closestTreeDist)
+		{
+			closestTreeDist = treeDist;
+			treeTile = tileIndex + currentNeighbor;
+		}
+	}
+	return max(closestTreeDist * sceneScale, sdBoundingRegion(p));
+}
+
+float map(vec3 p, float terrainHeight)
+{
+	vec2 treeTile;
+	return map(p, terrainHeight, treeTile);
+}
+
+float map(vec3 p)
+{
+	return map(p, terrainHeightAt(p.xz));
+}
+
+// -------------------------------------------------------------------------------------------------------------
+// Normals
+// -------------------------------------------------------------------------------------------------------------
+
+vec3 getNormal(vec3 p)
+{
+	const float normalEps = 0.001 * sceneScale;
+	float eps = normalEps;
+	float h = terrainHeightAt(p.xz);
+	return normalize(vec3(
+		map(vec3(p.x + eps, p.y,       p.z      ), h) - map(vec3(p.x - eps, p.y,       p.z      ), h),
+		map(vec3(p.x,       p.y + eps, p.z      ), h) - map(vec3(p.x,       p.y - eps, p.z      ), h),
+		map(vec3(p.x,       p.y,       p.z + eps), h) - map(vec3(p.x,       p.y,       p.z - eps), h)
+	));
+}
+
+// -------------------------------------------------------------------------------------------------------------
+// Sphere tracing
+// -------------------------------------------------------------------------------------------------------------
+
+float refineHit(vec3 ro, vec3 rd, float tOut, float tIn, out vec3 hitPos)
+{
+	const int refineSteps = 10;
+	for (int i = 0; i < refineSteps; i++)
+	{
+		float tMid = 0.5 * (tOut + tIn);
+		if (map(ro + rd * tMid) < 0.0)
+			tIn = tMid;
+		else
+			tOut = tMid;
+	}
+	hitPos = ro + rd * tOut;
+	return tOut;
+}
+
+float raymarch(vec3 ro, vec3 rd, out vec3 hitPos)
+{
+	const float groundY = 0.0;
+	const float terrainAmp = 12.9;
+	const float hitEps = 0.0002;
+	const float fallbackEps = 0.002;
+	const float maxStep = 0.2;
+ 
+	float treesTop = groundY + terrainAmp * fbmMaxValue() + 1.2 * baseTreeHeight * sceneScale;
+	float t = 0.0;
+	float d = 0.0;
+
+	float tPrev = 0.0;
+
+	for (int i = 0; i < 1000; i++)
+	{
+		vec3 p = ro + rd * t;
+
+		if (rd.y >= 0.0 && p.y > treesTop)
+			return -1.0;
+
+		float terrainHeight = terrainHeightAt(p.xz);
+		if (p.y < terrainHeight)
+				return -1.0;
+
+		d = map(p, terrainHeight);
+		if (d < 0.0)
+			return refineHit(ro, rd, tPrev, t, hitPos);
+
+		if (d < hitEps * t)
+		{
+			hitPos = p;
+			return t;
+		}
+
+		tPrev = t;
+		t += min(d, maxStep);
+
+		if (t > 180.0)
+			return -1.0;
+	}
+
+	if (d < fallbackEps * t)
+	{
+		hitPos = ro + rd * t;
+		return t;
+	}
+	return -1.0;
+}
+
+// -------------------------------------------------------------------------------------------------------------
+// Main
+// -------------------------------------------------------------------------------------------------------------
+
+void main()
+{
+
+	vec2 ndc = (gl_FragCoord.xy / u_Resolution) * 2.0 - 1.0;
+
+	vec4 farClip = vec4(ndc, 1.0, 1.0);
+
+	vec4 far = u_InvVP * farClip;
+
+	far /= far.w;
+
+
+	vec3 ro = u_CamPos;
+	vec3 rd = normalize(far.xyz - ro);
+
+	// ----------------------------------
+	// Fase di Raymarching
+	// ----------------------------------
+
+	vec3 hitPos;
+	float t = raymarch(ro, rd, hitPos);
+	if (t < 0.0)
+		discard;
+
+	vec4 clip = u_VP * vec4(hitPos, 1.0);
+	gl_FragDepth = (clip.z / clip.w) * 0.5 + 0.5;
+
+	// Salva le normali
+	outNormal = getNormal(hitPos);
+
+	vec2 treeTile;
+	map(hitPos, terrainHeightAt(hitPos.xz), treeTile);
+	outAlbedo = vec4(hashColor(treeTile), 1.0);
+}

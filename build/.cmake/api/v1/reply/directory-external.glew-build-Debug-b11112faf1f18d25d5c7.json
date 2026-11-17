@@ -1,0 +1,126 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"install"
+		],
+		"files" : 
+		[
+			"external/glew-2.3.1/build/cmake/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 172,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 230,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 244,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 249,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 252,
+				"parent" : 0
+			}
+		]
+	},
+	"codemodelVersion" : 
+	{
+		"major" : 2,
+		"minor" : 10
+	},
+	"installers" : 
+	[
+		{
+			"backtrace" : 1,
+			"component" : "Development",
+			"destination" : "lib",
+			"paths" : 
+			[
+				"lib/libglew32d.a"
+			],
+			"targetId" : "glew_s::@004ee8d6e25d059c0821",
+			"targetIndex" : 2,
+			"type" : "target"
+		},
+		{
+			"backtrace" : 2,
+			"component" : "Development",
+			"destination" : "lib/pkgconfig",
+			"paths" : 
+			[
+				"build/external/glew-build/glew.pc"
+			],
+			"type" : "file"
+		},
+		{
+			"backtrace" : 3,
+			"component" : "Development",
+			"destination" : "include/GL",
+			"paths" : 
+			[
+				"external/glew-2.3.1/build/cmake/../../include/GL/wglew.h",
+				"external/glew-2.3.1/build/cmake/../../include/GL/glew.h",
+				"external/glew-2.3.1/build/cmake/../../include/GL/glxew.h",
+				"external/glew-2.3.1/build/cmake/../../include/GL/eglew.h"
+			],
+			"type" : "file"
+		},
+		{
+			"backtrace" : 4,
+			"component" : "Development",
+			"destination" : "lib/cmake/glew",
+			"exportName" : "glew-targets",
+			"exportTargets" : 
+			[
+				{
+					"id" : "glew_s::@004ee8d6e25d059c0821",
+					"index" : 2
+				}
+			],
+			"paths" : 
+			[
+				"external/glew-build/CMakeFiles/Export/7a894a12241bfddc41ca6be6d0e647bd/glew-targets.cmake"
+			],
+			"type" : "export"
+		},
+		{
+			"backtrace" : 5,
+			"component" : "Development",
+			"destination" : "lib/cmake/glew",
+			"paths" : 
+			[
+				"external/glew-2.3.1/build/cmake/glew-config.cmake",
+				"external/glew-2.3.1/build/cmake/CopyImportedTargetProperties.cmake"
+			],
+			"type" : "file"
+		}
+	],
+	"paths" : 
+	{
+		"build" : "external/glew-build",
+		"source" : "external/glew-2.3.1/build/cmake"
+	}
+}
