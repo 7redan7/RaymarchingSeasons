@@ -66,14 +66,14 @@ float sdBoundingRegion(vec3 p)
 
 vec2 TreeHash(vec2 p)
 {
-	const vec2 k = vec2(0.3183099, 0.3678794);  // 1/pi e 1/e
+	const vec2 k = vec2(0.3183099, 0.3678794);
 	float n = 109.0 * p.x + 113.0 * p.y;
 	return fract(n * fract(k * n));
 }
 
-const float sceneScale = 0.1;             // unità della scena per metro
-const float tileSize = 2.0;               // lato della tile. Una tile più grande riduce quanto sono fitti gli alberi
-const float baseTreeHeight = 4.8;         // altezza di riferimento degli alberi: variano dal 40% al 120% di questo valore
+const float sceneScale = 0.1;
+const float tileSize = 2.0;
+const float baseTreeHeight = 4.8;
 
 vec3 seasonColor(int season, vec2 tileIndex, float t)
 {
@@ -84,10 +84,12 @@ vec3 seasonColor(int season, vec2 tileIndex, float t)
 	if (season == 2)
 	{
 		float variation = TreeHash(tileIndex + vec2(53.1, 24.7)).y;
-		vec3 autumn = variation < 0.333 ? vec3(0.82, 0.42, 0.12) :
-						variation < 0.666 ? vec3(0.90, 0.62, 0.20) :
-											vec3(0.59, 0.35, 0.18);
-		return autumn * mix(0.9, 1.1, t);
+		vec3 autumn = variation < 0.14 ? vec3(0.49, 0.57, 0.30) :
+						variation < 0.35 ? vec3(0.39, 0.58, 0.22) :
+						variation < 0.58 ? vec3(0.80, 0.66, 0.28) :
+						variation < 0.75 ? vec3(0.66, 0.30, 0.23) :
+										vec3(0.80, 0.40, 0.20);
+		return autumn * mix(0.94, 1.04, t);
 	}
 	return mix(vec3(0.72, 0.78, 0.82), vec3(0.96, 0.97, 1.0), t);
 }
@@ -100,34 +102,26 @@ vec3 hashColor(vec2 tileIndex)
 	return mix(seasonColor(season, tileIndex, t), seasonColor((season + 1) % 4, tileIndex, t), blend);
 }
 
-// out vec2 treeTile è scartato sempre tranne che nella chiamata che si trova nel main
 float map(vec3 p, float terrainHeight, out vec2 treeTile)
 {
 	vec3 pMeters = vec3(p.x, p.y - terrainHeight, p.z) / sceneScale;
-	float closestTreeDist = 10000.0;                            // Valore iniziale grande per il min
-	vec2 tileIndex = floor(pMeters.xz / tileSize);              // Indice della tile di p
-	vec2 tileOffset = fract(pMeters.xz / tileSize);             // Posizione di p dentro la tile, in [0,1)
+	float closestTreeDist = 10000.0;
+	vec2 tileIndex = floor(pMeters.xz / tileSize);
+	vec2 tileOffset = fract(pMeters.xz / tileSize);
 	treeTile = tileIndex;
 	for (int j = 0; j <= 1; j++)
 	for (int i = 0; i <= 1; i++)
 	{
-		// Data la posizione di p, si controllano gli alberi della tile di p e delle 3 più vicine a p
-		// currentNeighbor conterrà lo spostamento che porta alle quattro possibili tile
-		// Es. tileIndex=(2,2), tileOffset=(0.1,0.2),   step(tileOffset, vec2(0.5))=(1,1)
-		// currentNeighbor(j=0,i=0)=(0,0)-(1,1)=(-1,-1) -> tile (1,1)   currentNeighbor(j=0,i=1)=(1,0)-(1,1)=( 0,-1) -> tile (2,1)
-		// currentNeighbor(j=1,i=0)=(0,1)-(1,1)=(-1, 0) -> tile (1,2)   currentNeighbor(j=1,i=1)=(1,1)-(1,1)=( 0, 0) -> tile (2,2)
 
 		vec2 currentNeighbor = vec2(float(i), float(j)) - step(tileOffset, vec2(0.5));
 
-		// Calcolata quale tile stiamo valutando, si fa uso di TreeHash() per calcolare randomicamente le caratteristiche dell'albero
 
-		vec2 treeCenter = TreeHash(tileIndex + currentNeighbor);                   // Centro dell'albero rispetto alla tile, in [0,1)
-		vec2 treeSize = TreeHash(tileIndex + currentNeighbor + vec2(13.1, 71.7));  // Proporzioni dell'albero, offset diverso per scollegare size da center
+		vec2 treeCenter = TreeHash(tileIndex + currentNeighbor);
+		vec2 treeSize = TreeHash(tileIndex + currentNeighbor + vec2(13.1, 71.7));
 
-		vec2 d = (currentNeighbor - tileOffset + treeCenter);                   // Vettore da p al centro dell'albero
-		float treeHeight = baseTreeHeight * (0.4 + 0.8 * treeSize.x);           // L'altezza dipende da treeSize.x
-		// float treeWidth  = 0.5 + 0.2 * treeSize.x + 0.3 * treeSize.y;        // La larghezza dipende invece da treeSize.xy
-		float treeWidth = 0.5;                                                  // larghezza fissa, pari a metà della tile
+		vec2 d = (currentNeighbor - tileOffset + treeCenter);
+		float treeHeight = baseTreeHeight * (0.4 + 0.8 * treeSize.x);
+		float treeWidth = 0.5;
 
 		vec3 pLocal = vec3(d.x, pMeters.y - 0.5 * treeHeight, d.y);
 		float treeDist = sdEllipsoid(pLocal, vec2(treeWidth, 0.5 * treeHeight));
@@ -157,7 +151,7 @@ float map(vec3 p)
 
 vec3 getNormal(vec3 p)
 {
-	const float normalEps = 0.001 * sceneScale; // Distanza dei campioni da p
+	const float normalEps = 0.001 * sceneScale;
 	float eps = normalEps;
 	float h = terrainHeightAt(p.xz);
 	return normalize(vec3(
@@ -188,15 +182,15 @@ float refineHit(vec3 ro, vec3 rd, float tOut, float tIn, out vec3 hitPos)
 
 float raymarch(vec3 ro, vec3 rd, out vec3 hitPos)
 {
-	const float groundY = 0.0;     // y del piano piatto (prima dell'eventuale altezza da Perlin)
+	const float groundY = 0.0;
 	const float terrainAmp = 12.9;
-	const float hitEps = 0.0002;        // Soglia di hit (relativa a t)
-	const float fallbackEps = 0.002;    // Soglia (relativa a t) entro cui viene comunque considerato un hit
-	const float maxStep = 0.2;          // Lunghezza massima dello step
+	const float hitEps = 0.0002;
+	const float fallbackEps = 0.002;
+	const float maxStep = 0.2;
  
 	float treesTop = groundY + terrainAmp * fbmMaxValue() + 1.2 * baseTreeHeight * sceneScale;
-	float t = 0.0;              // Distanza totale percorsa
-	float d = 0.0;              // Distanza del passo
+	float t = 0.0;
+	float d = 0.0;
 
 	float tPrev = 0.0;
 
@@ -204,34 +198,30 @@ float raymarch(vec3 ro, vec3 rd, out vec3 hitPos)
 	{
 		vec3 p = ro + rd * t;
 
-		if (rd.y >= 0.0 && p.y > treesTop)                      // Miss se il raggio supera l'altezza massima
+		if (rd.y >= 0.0 && p.y > treesTop)
 			return -1.0;
 
 		float terrainHeight = terrainHeightAt(p.xz);
-		if (p.y < terrainHeight)                                // Miss se il raggio scende sotto il terreno
+		if (p.y < terrainHeight)
 				return -1.0;
 
 		d = map(p, terrainHeight);
-		if (d < 0.0)                                            // La SDF degli alberi è calcolata come se fosse in un piano (altrimenti dovremmo guardare in memoria 
-			return refineHit(ro, rd, tPrev, t, hitPos);         // 5 volte invece che una). Quindi il passo non è molto preciso, per ora serve una bisezione per ridefinire
+		if (d < 0.0)
+			return refineHit(ro, rd, tPrev, t, hitPos);
 
-		if (d < hitEps * t)     // La soglia di hit aumenta all'aumentare della distanza totale percorsa.
-		{                       // hitEps indica quanto la distanza totale influenza la soglia di hit
-			hitPos = p;         // (maggiore è hitEps, meno precisione sarà necessaria per ottenere un hit)
+		if (d < hitEps * t)
+		{
+			hitPos = p;
 			return t;
 		}
 
 		tPrev = t;
-		t += min(d, maxStep);   // Dato che la SDF calcola solo alcune delle celle con gli alberi, quando i raggi hanno un inclinazione parallela al terreno
-								// possono passare oltre agli alberi e non disegnano niente. Per ora il passo è limitato.
-								// TODO: la bisezione dovrebbe far accadere l'hit, ma il pixel è scartato prima dal check del terreno.
+		t += min(d, maxStep);
 
-		if (t > 180.0)          // Miss per distanza massima
+		if (t > 180.0)
 			return -1.0;
 	}
 
-	// Fallback: se finiti i passi l'ultima distanza misurata d è piccola rispetto alla distanza dalla camera,
-	// lo si conta come hit
 	if (d < fallbackEps * t)
 	{
 		hitPos = ro + rd * t;
@@ -246,31 +236,16 @@ float raymarch(vec3 ro, vec3 rd, out vec3 hitPos)
 
 void main()
 {
-	// -------------------------------------------------------------------------------------------------------------
-	// Dobbiamo ricostruire il raggio che va dalla camera al pixel.
-	// Attualmente dentro gl_FragCoord abbiamo le coordinate del pixel in Screen Space;
-	// a noi servono le coordinate del pixel in world space.
-	// -------------------------------------------------------------------------------------------------------------
 
-	// Si inverte il viewport transform. Ovvero Screen Space -> NDC
 	vec2 ndc = (gl_FragCoord.xy / u_Resolution) * 2.0 - 1.0;
 
-	// Si prende il punto in NDC sul far plane (z=1.0) e lo si interpreta in clip space con w=1.0.
-	// Ovvero NDC -> Clip Space
-	// Il vero w_clip è andato perso con la divisione prospettica. Scegliendo w=1.0 si ottiene il vero punto
-	// in clip space ma scalato di 1/w_clip con w_clip incognito.
 	vec4 farClip = vec4(ndc, 1.0, 1.0);
 
-	// Si moltiplica per l'inversa della matrice VP. Ovvero Clip Space -> World Space
 	vec4 far = u_InvVP * farClip;
 
-	// far è il punto in world space ancora scalato di 1/w_clip, e far.w vale proprio 1/w_clip.
-	// Dividendo tutto il vettore per w si elimina il fattore 1/w_clip e si torna a w=1.
 	far /= far.w;
 
-	// far.xyz è la posizione in world space del punto che sul far plane corrisponde al pixel
 
-	// Il raggio parte dalla camera e passa per il punto sul far plane
 	vec3 ro = u_CamPos;
 	vec3 rd = normalize(far.xyz - ro);
 
@@ -281,17 +256,14 @@ void main()
 	vec3 hitPos;
 	float t = raymarch(ro, rd, hitPos);
 	if (t < 0.0)
-		discard;    // nessun hit lungo il raggio
+		discard;
 
-	// Si scrive dentro gl_FragDepth la profondità del punto raymarchato. Il valore sarà utilizzato
-	// durante il depth test
 	vec4 clip = u_VP * vec4(hitPos, 1.0);
 	gl_FragDepth = (clip.z / clip.w) * 0.5 + 0.5;
 
 	// Salva le normali
 	outNormal = getNormal(hitPos);
 
-	// Salva il colore. Calcolarlo necessita della tile, quindi deve ricalcolare il map
 	vec2 treeTile;
 	map(hitPos, terrainHeightAt(hitPos.xz), treeTile);
 	outAlbedo = vec4(hashColor(treeTile), 1.0);

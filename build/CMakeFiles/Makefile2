@@ -153,8 +153,8 @@ external/glfw-3.4/src/clean: external/glfw-3.4/src/CMakeFiles/update_mappings.di
 # Target rules for target CMakeFiles/RaymarchingSeasons.dir
 
 # All Build rule for target.
-CMakeFiles/RaymarchingSeasons.dir/all: external/glfw-3.4/src/CMakeFiles/glfw.dir/all
 CMakeFiles/RaymarchingSeasons.dir/all: CMakeFiles/imgui.dir/all
+CMakeFiles/RaymarchingSeasons.dir/all: external/glfw-3.4/src/CMakeFiles/glfw.dir/all
 CMakeFiles/RaymarchingSeasons.dir/all: external/glew-build/CMakeFiles/glew_s.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\RaymarchingSeasons.dir\build.make CMakeFiles/RaymarchingSeasons.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\RaymarchingSeasons.dir\build.make CMakeFiles/RaymarchingSeasons.dir/build

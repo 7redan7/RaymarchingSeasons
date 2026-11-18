@@ -168,7 +168,7 @@ int main(void)
 
 	unsigned int programRaymarchTrees = buildProgram(
 							"../src/res/common/fullscreen.vertexshader",
-							"../src/res/raymarch/raymarchTrees.fragmentshader");
+							"../src/res/raymarch/raymarchTreesV2.fragmentshader");
 
 	unsigned int RaymarchTrees_u_InvVP = glGetUniformLocation(programRaymarchTrees, "u_InvVP");
 	unsigned int RaymarchTrees_u_VP = glGetUniformLocation(programRaymarchTrees, "u_VP");
